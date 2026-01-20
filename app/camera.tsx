@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import Constants from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -9,12 +10,11 @@ import {
   View,
 } from "react-native";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = Constants.expoConfig?.extra?.apiUrl;
 
 export default function CameraScreen() {
   const router = useRouter();
   const { age } = useLocalSearchParams<{ age?: string }>();
-
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.center}>
-        <Text style={styles.text}>Camera access is required</Text>
+        <Text style={styles.text}>Camera access required</Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
@@ -33,11 +33,7 @@ export default function CameraScreen() {
   }
 
   const takePicture = async () => {
-    if (!cameraRef.current || loading) return;
-    if (!API_URL) {
-      console.error("BACKEND URL IS MISSING");
-      return;
-    }
+    if (!cameraRef.current || loading || !API_URL) return;
 
     setLoading(true);
 
@@ -63,7 +59,7 @@ export default function CameraScreen() {
         params: { analysis: JSON.stringify(analysis) },
       });
     } catch (e) {
-      console.error(e);
+      console.error("Camera error:", e);
     } finally {
       setLoading(false);
     }
@@ -72,7 +68,6 @@ export default function CameraScreen() {
   return (
     <View style={{ flex: 1 }}>
       <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
-
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.capture}
