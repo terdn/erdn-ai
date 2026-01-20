@@ -1,5 +1,4 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
-import Constants from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -10,21 +9,20 @@ import {
   View,
 } from "react-native";
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl;
-
 export default function CameraScreen() {
   const router = useRouter();
   const { age } = useLocalSearchParams<{ age?: string }>();
+
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
 
-  if (!permission) return <View />;
+  if (!permission) return <View style={{ flex: 1, backgroundColor: "#000" }} />;
 
   if (!permission.granted) {
     return (
       <View style={styles.center}>
-        <Text style={styles.text}>Camera access required</Text>
+        <Text style={styles.text}>Camera access is required</Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
@@ -33,7 +31,7 @@ export default function CameraScreen() {
   }
 
   const takePicture = async () => {
-    if (!cameraRef.current || loading || !API_URL) return;
+    if (!cameraRef.current || loading) return;
 
     setLoading(true);
 
@@ -43,23 +41,30 @@ export default function CameraScreen() {
         quality: 0.7,
       });
 
-      const res = await fetch(`${API_URL}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: photo.base64,
-          age: age ?? "unknown",
-        }),
-      });
+      if (!photo.base64) throw new Error("No image data");
 
-      const analysis = await res.json();
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/analyze`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image: photo.base64,
+            age: age ?? "unknown",
+          }),
+        }
+      );
+
+      const analysis = await response.json();
 
       router.push({
         pathname: "/analysis",
-        params: { analysis: JSON.stringify(analysis) },
+        params: {
+          analysis: JSON.stringify(analysis),
+        },
       });
-    } catch (e) {
-      console.error("Camera error:", e);
+    } catch (err) {
+      console.error("Camera analyze error:", err);
     } finally {
       setLoading(false);
     }
@@ -67,14 +72,27 @@ export default function CameraScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
-      <View style={styles.controls}>
+      {/* CAMERA */}
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing="front"
+        pointerEvents="none" // 🔥 BU SATIR KRİTİK
+      />
+
+      {/* OVERLAY */}
+      <View style={styles.overlay} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.capture}
           onPress={takePicture}
           disabled={loading}
+          activeOpacity={0.7}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <View style={styles.inner} />}
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <View style={styles.inner} />
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -82,18 +100,18 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  controls: {
+  overlay: {
     position: "absolute",
     bottom: 40,
     width: "100%",
     alignItems: "center",
+    pointerEvents: "box-none",
   },
   capture: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    borderWidth: 4,
-    borderColor: "#fff",
+    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -101,7 +119,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: "#fff",
+    backgroundColor: "#000",
   },
   center: {
     flex: 1,
