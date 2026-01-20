@@ -1,0 +1,68 @@
+import cors from "cors";
+import dotenv from "dotenv";
+import express from "express";
+import fetch from "node-fetch";
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+
+app.get("/", (req, res) => {
+  res.json({ status: "ERDN backend running" });
+});
+
+app.post("/analyze", async (req, res) => {
+  const { image, age } = req.body;
+  if (!image) return res.status(400).json({ error: "No image provided" });
+
+  const prompt = `
+Analyze the user's face and return STRICT JSON ONLY:
+
+{
+  "skinProfile": {
+    "type": "...",
+    "undertone": "...",
+    "concern": "..."
+  },
+  "recommendedProducts": [],
+  "routine": {
+    "day": [],
+    "night": []
+  }
+}
+
+Age: ${age}
+`;
+
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType: "image/jpeg", data: image } }
+            ]
+          }
+        ]
+      })
+    }
+  );
+
+  const data = await geminiRes.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  try {
+    res.json(JSON.parse(text));
+  } catch {
+    res.status(500).json({ error: "Invalid AI response", raw: text });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on", PORT));
