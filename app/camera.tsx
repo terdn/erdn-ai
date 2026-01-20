@@ -12,7 +12,10 @@ import {
 
 // 🔴 PROD BACKEND URL
 // Expo’da env böyle okunur
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import Constants from "expo-constants";
+
+const API_URL = Constants.expoConfig?.extra?.API_URL;
+
 
 export default function CameraScreen() {
   const router = useRouter();
