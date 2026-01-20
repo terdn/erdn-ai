@@ -21,19 +21,23 @@ app.post("/analyze", async (req, res) => {
     const prompt = `
 You are a professional digital skincare analyst.
 
-You are analyzing a REAL HUMAN FACE photo.
+Analyze the provided real human face image.
 
-Your task:
-- Analyze visible skin characteristics ONLY
-- Do NOT guess medical conditions
-- Do NOT mention diseases or diagnoses
-- Do NOT recommend brands
-- Do NOT exaggerate
-- Be calm, confident, and premium in tone
+Rules:
+- No medical diagnosis
+- No diseases
+- No brand names
+- No exaggeration
+- Premium, calm, confident tone
+- Base everything ONLY on visible skin
 
 User age: ${age}
 
-Return STRICT JSON ONLY in the following format:
+Return ONLY valid JSON.
+Do NOT use markdown.
+Do NOT add explanations.
+
+JSON format:
 
 {
   "skinProfile": {
@@ -41,27 +45,11 @@ Return STRICT JSON ONLY in the following format:
     "undertone": "",
     "concern": ""
   },
-  "detailedObservations": [
-    "",
-    "",
-    ""
-  ],
-  "recommendedProducts": [
-    "",
-    "",
-    ""
-  ],
+  "detailedObservations": ["", "", ""],
+  "recommendedProducts": ["", "", ""],
   "routine": {
-    "day": [
-      "",
-      "",
-      ""
-    ],
-    "night": [
-      "",
-      "",
-      ""
-    ]
+    "day": ["", "", ""],
+    "night": ["", "", ""]
   },
   "confidenceNote": ""
 }
@@ -71,9 +59,7 @@ Return STRICT JSON ONLY in the following format:
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
             {
@@ -94,14 +80,22 @@ Return STRICT JSON ONLY in the following format:
 
     const result = await geminiResponse.json();
 
-    const text =
+    const rawText =
       result?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) {
-      throw new Error("Gemini returned empty response");
+    if (!rawText) {
+      throw new Error("Empty Gemini response");
     }
 
-    const parsed = JSON.parse(text);
+    // 🔥 EN KRİTİK KISIM — JSON GÜVENLİ AYIKLAMA
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      console.error("Gemini raw output:", rawText);
+      throw new Error("No JSON found in Gemini output");
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
     res.json(parsed);
   } catch (err) {
     console.error("Analyze error:", err);
@@ -110,6 +104,6 @@ Return STRICT JSON ONLY in the following format:
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log("ERDN server running on port", PORT)
-);
+app.listen(PORT, () => {
+  console.log("ERDN server running on port", PORT);
+});
