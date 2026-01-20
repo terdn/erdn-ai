@@ -4,7 +4,7 @@ import express from "express";
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "12mb" }));
 
 app.get("/", (req, res) => {
   res.json({ status: "ERDN backend running" });
@@ -15,72 +15,61 @@ app.post("/analyze", async (req, res) => {
     const { image, age } = req.body;
 
     if (!image) {
-      return res.status(400).json({ error: "No image provided" });
+      return res.status(400).json({ error: "Image is required" });
     }
 
     const prompt = `
-You are a high-end digital skincare consultant operating at a Vogue-level editorial and dermatologist-informed standard.
+You are a high-end digital skin analyst working at a luxury dermatology clinic.
 
 You are analyzing a REAL HUMAN FACE photo.
 
-Rules:
-- Analyze only what is visually observable.
-- Do NOT diagnose or mention medical conditions or diseases.
-- Do NOT recommend brands or commercial products.
-- Do NOT exaggerate or overpromise results.
-- Maintain a calm, confident, premium tone.
-- Be reassuring, elegant, and human — never robotic.
+STRICT RULES:
+- Do NOT mention brands
+- Do NOT mention diseases or diagnoses
+- Do NOT exaggerate
+- Do NOT use emojis
+- Do NOT leave any field empty
+- Be calm, precise, confident, premium
+- Write for a paying user
 
-User age: ${age}
+User age: ${age ?? "not specified"}
 
-Your goal:
-Create a personalized, premium skincare analysis that feels bespoke, refined, and trustworthy.
+You MUST return VALID JSON.
+ALL fields MUST be filled with meaningful content.
 
-You may recommend ingredients (vitamins, acids, SPF) only when visually appropriate.
-If exfoliating acids are relevant, provide SAFE percentage ranges, not exact prescriptions.
-
-Determine the routine duration dynamically based on the skin’s visible needs.
-Do NOT use a fixed timeframe.
-
-Return STRICT JSON ONLY in the following format:
+JSON FORMAT (STRICT):
 
 {
   "skinProfile": {
-    "type": "",
-    "undertone": "",
-    "concerns": ""
+    "type": "Clear explanation of skin type in 1–2 sentences",
+    "undertone": "Clear undertone description in 1 sentence",
+    "concern": "At least ONE clear, realistic skin concern in 1 sentence"
   },
-  "detailedObservations": [
-    "",
-    "",
-    ""
-  ],
   "recommendedProducts": [
-    "",
-    "",
-    "",
-    ""
+    "Product category + purpose + key ingredients (example: niacinamide, ceramides, vitamin C, SPF value if relevant)",
+    "Product category + purpose + key ingredients",
+    "Product category + purpose + key ingredients"
   ],
   "routine": {
     "day": [
-      "",
-      "",
-      ""
+      "Step name + short explanation",
+      "Step name + short explanation",
+      "Step name + short explanation"
     ],
     "night": [
-      "",
-      "",
-      ""
+      "Step name + short explanation",
+      "Step name + short explanation (include usage frequency if actives are involved)",
+      "Step name + short explanation"
     ]
   },
-  "programDuration": {
-    "estimatedTimeline": "",
-    "whyThisDuration": "",
-    "whatToExpect": ""
-  },
-  "confidenceNote": ""
+  "programGuidance": "Estimated time frame (for example 3–5 weeks) explaining when visible improvements may begin with consistent use.",
+  "confidenceNote": "A short, reassuring, premium closing sentence."
 }
 
+Remember:
+- NO empty fields
+- NO generic filler
+- Write like a dermatologist speaking to a premium client
 `;
 
     const geminiResponse = await fetch(
@@ -96,34 +85,28 @@ Return STRICT JSON ONLY in the following format:
                 {
                   inlineData: {
                     mimeType: "image/jpeg",
-                    data: image,
-                  },
-                },
-              ],
-            },
-          ],
-        }),
+                    data: image
+                  }
+                }
+              ]
+            }
+          ]
+        })
       }
     );
 
-    const result = await geminiResponse.json();
+    const data = await geminiResponse.json();
 
-    const rawText =
-      result?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!rawText) {
-      throw new Error("Empty Gemini response");
+    if (!text) {
+      throw new Error("Empty response from Gemini");
     }
 
-    // 🔥 EN KRİTİK KISIM — JSON GÜVENLİ AYIKLAMA
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const cleaned = text.trim().replace(/```json|```/g, "");
+    const parsed = JSON.parse(cleaned);
 
-    if (!jsonMatch) {
-      console.error("Gemini raw output:", rawText);
-      throw new Error("No JSON found in Gemini output");
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
     res.json(parsed);
   } catch (err) {
     console.error("Analyze error:", err);
