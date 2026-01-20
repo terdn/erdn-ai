@@ -1,8 +1,5 @@
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
-
-dotenv.config();
 
 const app = express();
 
@@ -21,36 +18,91 @@ app.post("/analyze", async (req, res) => {
       return res.status(400).json({ error: "No image provided" });
     }
 
-    // 🔥 ŞİMDİLİK DUMMY – GEMINI ZATEN BAĞLI
-    // sadece crash olmasın diye
-    res.json({
-      skinProfile: {
-        type: "Combination skin",
-        undertone: "Neutral-Warm",
-        concern: "Mild congestion around chin and jawline",
-      },
-      recommendedProducts: [
-        "Gentle cleanser",
-        "Hydrating serum",
-        "Lightweight moisturizer",
-      ],
-      routine: {
-        day: [
-          "Cleanse gently",
-          "Apply hydrating serum",
-          "Use SPF 30+ sunscreen",
-        ],
-        night: [
-          "Cleanse thoroughly",
-          "Target congested areas",
-          "Moisturize",
-        ],
-      },
-      meta: {
-        age,
-        ai: "gemini-2.5-flash",
-      },
-    });
+    const prompt = `
+You are a professional digital skincare analyst.
+
+You are analyzing a REAL HUMAN FACE photo.
+
+Your task:
+- Analyze visible skin characteristics ONLY
+- Do NOT guess medical conditions
+- Do NOT mention diseases or diagnoses
+- Do NOT recommend brands
+- Do NOT exaggerate
+- Be calm, confident, and premium in tone
+
+User age: ${age}
+
+Return STRICT JSON ONLY in the following format:
+
+{
+  "skinProfile": {
+    "type": "",
+    "undertone": "",
+    "concern": ""
+  },
+  "detailedObservations": [
+    "",
+    "",
+    ""
+  ],
+  "recommendedProducts": [
+    "",
+    "",
+    ""
+  ],
+  "routine": {
+    "day": [
+      "",
+      "",
+      ""
+    ],
+    "night": [
+      "",
+      "",
+      ""
+    ]
+  },
+  "confidenceNote": ""
+}
+`;
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: "image/jpeg",
+                    data: image,
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    const result = await geminiResponse.json();
+
+    const text =
+      result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      throw new Error("Gemini returned empty response");
+    }
+
+    const parsed = JSON.parse(text);
+    res.json(parsed);
   } catch (err) {
     console.error("Analyze error:", err);
     res.status(500).json({ error: "Analysis failed" });
@@ -58,6 +110,6 @@ app.post("/analyze", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log("ERDN server running on port", PORT)
+);
