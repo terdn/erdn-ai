@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-const API_URL = "https://erdn-ai-production.up.railway.app"; // 🔥 SABİT
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -34,6 +34,10 @@ export default function CameraScreen() {
 
   const takePicture = async () => {
     if (!cameraRef.current || loading) return;
+    if (!API_URL) {
+      console.error("BACKEND URL IS MISSING");
+      return;
+    }
 
     setLoading(true);
 
@@ -43,9 +47,7 @@ export default function CameraScreen() {
         quality: 0.7,
       });
 
-      if (!photo.base64) throw new Error("No image data");
-
-      const response = await fetch(`${API_URL}/analyze`, {
+      const res = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -54,17 +56,14 @@ export default function CameraScreen() {
         }),
       });
 
-      const analysis = await response.json();
+      const analysis = await res.json();
 
       router.push({
         pathname: "/analysis",
-        params: {
-          analysis: JSON.stringify(analysis),
-        },
+        params: { analysis: JSON.stringify(analysis) },
       });
-    } catch (err) {
-      console.error("Analyze error:", err);
-      alert("Analysis failed");
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -80,11 +79,7 @@ export default function CameraScreen() {
           onPress={takePicture}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <View style={styles.inner} />
-          )}
+          {loading ? <ActivityIndicator color="#fff" /> : <View style={styles.inner} />}
         </TouchableOpacity>
       </View>
     </View>
