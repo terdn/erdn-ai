@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,6 +17,8 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
+
+  const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: "#000" }} />;
 
@@ -33,6 +36,14 @@ export default function CameraScreen() {
   const takePicture = async () => {
     if (!cameraRef.current || loading) return;
 
+    if (!API_URL) {
+      Alert.alert(
+        "Configuration Error",
+        "Backend URL is missing. Check EXPO_PUBLIC_API_URL."
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -41,19 +52,25 @@ export default function CameraScreen() {
         quality: 0.7,
       });
 
-      if (!photo.base64) throw new Error("No image data");
+      if (!photo?.base64) {
+        throw new Error("Image capture failed");
+      }
 
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/analyze`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image: photo.base64,
-            age: age ?? "unknown",
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image: photo.base64,
+          age: age ?? null,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Server error: ${text}`);
+      }
 
       const analysis = await response.json();
 
@@ -63,33 +80,31 @@ export default function CameraScreen() {
           analysis: JSON.stringify(analysis),
         },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera analyze error:", err);
+      Alert.alert("Analysis Failed", err.message ?? "Unknown error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* CAMERA */}
+    <View style={{ flex: 1, backgroundColor: "#000" }}>
       <CameraView
         ref={cameraRef}
-        style={StyleSheet.absoluteFill}
+        style={{ flex: 1 }}
         facing="front"
-        pointerEvents="none" // 🔥 BU SATIR KRİTİK
       />
 
-      {/* OVERLAY */}
-      <View style={styles.overlay} pointerEvents="box-none">
+      <View style={styles.controls}>
         <TouchableOpacity
           style={styles.capture}
           onPress={takePicture}
           disabled={loading}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color="#000" />
+            <ActivityIndicator color="#fff" />
           ) : (
             <View style={styles.inner} />
           )}
@@ -100,18 +115,18 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  controls: {
     position: "absolute",
     bottom: 40,
     width: "100%",
     alignItems: "center",
-    pointerEvents: "box-none",
   },
   capture: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#fff",
+    borderWidth: 4,
+    borderColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -119,7 +134,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: "#000",
+    backgroundColor: "#fff",
   },
   center: {
     flex: 1,
