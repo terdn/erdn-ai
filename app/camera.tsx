@@ -3,19 +3,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
-// 🔴 PROD BACKEND URL
-// Expo’da env böyle okunur
-import Constants from "expo-constants";
-
-const API_URL = Constants.expoConfig?.extra?.API_URL;
-
+const API_URL = "https://erdn-ai-production.up.railway.app"; // 🔥 SABİT
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -41,11 +35,6 @@ export default function CameraScreen() {
   const takePicture = async () => {
     if (!cameraRef.current || loading) return;
 
-    if (!API_URL) {
-      Alert.alert("Error", "Backend URL is missing");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -54,24 +43,16 @@ export default function CameraScreen() {
         quality: 0.7,
       });
 
-      if (!photo.base64) {
-        throw new Error("No image data");
-      }
+      if (!photo.base64) throw new Error("No image data");
 
       const response = await fetch(`${API_URL}/analyze`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image: photo.base64,
           age: age ?? "unknown",
         }),
       });
-
-      if (!response.ok) {
-        throw new Error("Analysis request failed");
-      }
 
       const analysis = await response.json();
 
@@ -82,20 +63,16 @@ export default function CameraScreen() {
         },
       });
     } catch (err) {
-      console.error("Camera analyze error:", err);
-      Alert.alert("Error", "Analysis failed. Please try again.");
+      console.error("Analyze error:", err);
+      alert("Analysis failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
-      <CameraView
-        ref={cameraRef}
-        style={{ flex: 1 }}
-        facing="front"
-      />
+    <View style={{ flex: 1 }}>
+      <CameraView ref={cameraRef} style={{ flex: 1 }} facing="front" />
 
       <View style={styles.controls}>
         <TouchableOpacity
