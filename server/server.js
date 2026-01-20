@@ -1,9 +1,6 @@
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 import fetch from "node-fetch";
-
-dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -15,11 +12,16 @@ app.get("/", (req, res) => {
 
 app.post("/analyze", async (req, res) => {
   const { image, age } = req.body;
-  if (!image) return res.status(400).json({ error: "No image provided" });
+
+  if (!image) {
+    return res.status(400).json({ error: "No image provided" });
+  }
 
   const prompt = `
-Analyze the user's face and return STRICT JSON ONLY:
+Analyze the user's facial skin from the image.
+Return STRICT JSON only.
 
+Format:
 {
   "skinProfile": {
     "type": "...",
@@ -30,14 +32,17 @@ Analyze the user's face and return STRICT JSON ONLY:
   "routine": {
     "day": [],
     "night": []
+  },
+  "meta": {
+    "age": ${age},
+    "ai": "gemini-2.5-flash"
   }
 }
-
-Age: ${age}
 `;
 
   const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=" +
+      process.env.GEMINI_API_KEY,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,23 +51,25 @@ Age: ${age}
           {
             parts: [
               { text: prompt },
-              { inlineData: { mimeType: "image/jpeg", data: image } }
-            ]
-          }
-        ]
-      })
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: image,
+                },
+              },
+            ],
+          },
+        ],
+      }),
     }
   );
 
   const data = await geminiRes.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data.candidates[0].content.parts[0].text;
 
-  try {
-    res.json(JSON.parse(text));
-  } catch {
-    res.status(500).json({ error: "Invalid AI response", raw: text });
-  }
+  res.json(JSON.parse(text));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on", PORT));
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Server running");
+});
