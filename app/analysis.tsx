@@ -33,26 +33,21 @@ export default function AnalysisScreen() {
         Alert.alert("Permission required", "Gallery access is needed.");
         return;
       }
-
+  
       const uri = await viewShotRef.current.capture();
       await MediaLibrary.saveToLibraryAsync(uri);
-
-      Alert.alert(
-        "Saved",
-        "Your analysis has been saved to gallery.",
-        [
-          {
-            text: "OK",
-            onPress: () => BackHandler.exitApp(),
-          },
-        ],
-        { cancelable: false }
-      );
+  
+      // küçük gecikme Android için
+      setTimeout(() => {
+        BackHandler.exitApp();
+      }, 400);
+  
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Could not save analysis.");
     }
   };
+  
 
   return (
     <View style={{ flex: 1 }}>
